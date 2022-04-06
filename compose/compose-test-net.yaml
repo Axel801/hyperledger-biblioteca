@@ -8,7 +8,7 @@ version: '3.7'
 volumes:
   orderer.example.com:
   peer0.centroarte.example.com:
-  peer0.org2.example.com:
+  peer0.anabelsegura.example.com:
 
 networks:
   test:
