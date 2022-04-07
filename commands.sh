@@ -67,13 +67,6 @@ function networkDown(){
 }
 
 function createChannel(){
-    #Verificamos si la red está levantada, sino la levantamos
-    bringUpNetwork="false"
-    [[ $len -lt 4 ]] || [[ ! -d "organizations/peerOrganizations" ]] && bringUpNetwork="true" || println "Network Running Already"
-    if [ $bringUpNetwork == "true"  ]; then
-        infoln "Bringing up network"
-        networkUp
-    fi
     createChannel.sh $CHANNEL_NAME
 }
 
