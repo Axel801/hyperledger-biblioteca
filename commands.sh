@@ -67,7 +67,7 @@ function networkDown(){
 }
 
 function createChannel(){
-    createChannel.sh $CHANNEL_NAME
+    . createChannel.sh $CHANNEL_NAME
 }
 
 
