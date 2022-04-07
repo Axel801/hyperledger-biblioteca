@@ -66,6 +66,19 @@ function networkDown(){
     mkdir channel-artifacts
 }
 
+function createChannel(){
+    #Verificamos si la red está levantada, sino la levantamos
+    bringUpNetwork="false"
+    [[ $len -lt 4 ]] || [[ ! -d "organizations/peerOrganizations" ]] && bringUpNetwork="true" || println "Network Running Already"
+    if [ $bringUpNetwork == "true"  ]; then
+        infoln "Bringing up network"
+        networkUp
+    fi
+    createChannel.sh $CHANNEL_NAME
+}
+
+
+
 function appMessage(){
     echo " ____    _   _       _   _           _                               _   _                                 _                  _                       "
     echo "| __ )  (_) | |__   | | (_)   ___   | |_    ___    ___    __ _      | | | |  _   _   _ __     ___   _ __  | |       ___    __| |   __ _    ___   _ __ "
@@ -77,6 +90,7 @@ function appMessage(){
 appMessage
 # Obtenemos el primer parámetro
 MODE=$1
+CHANNEL_NAME="libroschannel"
 
 if [ "$MODE" == "up" ]; then
     println "Proceso de despliegue comenzando..."
@@ -84,6 +98,13 @@ if [ "$MODE" == "up" ]; then
     elif [ "$MODE" == "down" ]; then
     infoln "Stopping network"
     networkDown
+    elif [ "$MODE" == "restart" ]; then
+    infoln "Restarting network"
+    networkDown
+    networkUp
+    elif [ "$MODE" == "createChannel" ]; then
+    infoln "Creando canal '${CHANNEL_NAME}'."
+    createChannel
 fi
 
 
