@@ -33,8 +33,76 @@ createChannelGenesisBlock() {
     verifyResult $res "Failed to generate channel configuration transaction..."
 }
 
+createChannel() {
+    ORDERER_CA=${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+    ORDERER_ADMIN_TLS_SIGN_CERT=${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+    ORDERER_ADMIN_TLS_PRIVATE_KEY=${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.key
+    local rc=1
+    local COUNTER=1
+    while [ $rc -ne 0 -a $COUNTER -lt $MAX_RETRY ] ; do
+        sleep $DELAY
+        set -x
+        osnadmin channel join --channelID $CHANNEL_NAME --config-block ./channel-artifacts/${CHANNEL_NAME}.block -o localhost:7053 --ca-file "$ORDERER_CA" --client-cert "$ORDERER_ADMIN_TLS_SIGN_CERT" --client-key "$ORDERER_ADMIN_TLS_PRIVATE_KEY" >&log.txt
+        res=$?
+        { set +x; } 2>/dev/null
+        let rc=$res
+        COUNTER=$(expr $COUNTER + 1)
+    done
+    osnadmin channel list -o localhost:7053 --ca-file "$ORDERER_CA" --client-cert "$ORDERER_ADMIN_TLS_SIGN_CERT" --client-key "$ORDERER_ADMIN_TLS_PRIVATE_KEY"
+    
+}
+
+
+# joinChannel ORG
+joinChannel() {
+    FABRIC_CFG_PATH=$PWD/../config/
+    ORG=$1
+    setVariables $ORG
+    local rc=1
+    local COUNTER=1
+    ## Sometimes Join takes time, hence retry
+    while [ $rc -ne 0 -a $COUNTER -lt $MAX_RETRY ] ; do
+        sleep $DELAY
+        set -x
+        peer channel join -b $BLOCKFILE >&log.txt
+        res=$?
+        { set +x; } 2>/dev/null
+        let rc=$res
+        COUNTER=$(expr $COUNTER + 1)
+    done
+    cat log.txt
+    verifyResult $res "After $MAX_RETRY attempts, peer0.org${ORG} has failed to join channel '$CHANNEL_NAME' "
+}
+
+setAnchorPeer() {
+    ORG=$1
+    ${CONTAINER_CLI} exec cli ./scripts/setAnchorPeer.sh $ORG $CHANNEL_NAME
+}
+
 FABRIC_CFG_PATH=${PWD}/configtx
 
 ## Create channel genesis block
-infoln "Generating channel genesis block '${CHANNEL_NAME}.block'"
+infoln "Generando bloque genesis '${CHANNEL_NAME}.block'"
 createChannelGenesisBlock
+
+FABRIC_CFG_PATH=${PWD}/../fabric-samples/config
+BLOCKFILE="./channel-artifacts/${CHANNEL_NAME}.block"
+
+## Create channel
+infoln "Creando canal: ${CHANNEL_NAME}"
+createChannel
+successln "Canal creado correctamente"
+
+## Join all the peers to the channel
+infoln "Añadiendo centroarte peer al canal..."
+joinChannel "centroarte"
+infoln "Añadiendo anabelsegura peer al canal..."
+joinChannel "anabelsegura"
+
+# ## Set the anchor peers for each org in the channel
+# infoln "Setting anchor peer for org1..."
+# setAnchorPeer 1
+# infoln "Setting anchor peer for org2..."
+# setAnchorPeer 2
+
+# successln "Channel '$CHANNEL_NAME' joined"
