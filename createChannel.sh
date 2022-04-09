@@ -76,7 +76,41 @@ joinChannel() {
 
 setAnchorPeer() {
     ORG=$1
-    ${CONTAINER_CLI} exec cli ./scripts/setAnchorPeer.sh $ORG $CHANNEL_NAME
+    setVariables $ORG
+    ORDERER_CA=${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+    
+    peer channel fetch config channel-artifacts/config_block.pb -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com -c ${CHANNEL_NAME} --tls --cafile "$ORDERER_CA"
+    
+    cd channel-artifacts
+    
+    configtxlator proto_decode --input config_block.pb --type common.Block --output config_block.json
+    
+    jq '.data.data[0].payload.data.config' config_block.json > config.json
+    
+    cp config.json config_copy.json
+    
+    set -x
+    # Modify the configuration to append the anchor peer
+    jq '.channel_group.groups.Application.groups.'${CORE_PEER_LOCALMSPID}'.values += {"AnchorPeers":{"mod_policy": "Admins","value":{"anchor_peers": [{"host": "peer0.'${ORG}'.example.com","port": '${PORT_PEER}'}]},"version": "0"}}' config_copy.json > modified_config.json
+    { set +x; } 2>/dev/null
+    
+    set -x
+    configtxlator proto_encode --input config.json --type common.Config --output config.pb
+    
+    configtxlator proto_encode --input modified_config.json --type common.Config --output modified_config.pb
+    
+    configtxlator compute_update --channel_id ${CHANNEL_NAME} --original config.pb --updated modified_config.pb --output config_update.pb
+    
+    configtxlator proto_decode --input config_update.pb --type common.ConfigUpdate --output config_update.json
+    
+    echo '{"payload":{"header":{"channel_header":{"channel_id":"'${CHANNEL_NAME}'", "type":2}},"data":{"config_update":'$(cat config_update.json)'}}}' | jq . > config_update_in_envelope.json
+    
+    configtxlator proto_encode --input config_update_in_envelope.json --type common.Envelope --output config_update_in_envelope.pb
+    { set +x; } 2>/dev/null
+    cd ..
+    
+    peer channel update -f channel-artifacts/config_update_in_envelope.pb -c ${CHANNEL_NAME} -o localhost:7050  --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem"
+    
 }
 
 FABRIC_CFG_PATH=${PWD}/configtx
@@ -96,13 +130,19 @@ successln "Canal creado correctamente"
 ## Join all the peers to the channel
 infoln "Añadiendo centroarte peer al canal..."
 joinChannel "centroarte"
+successln "centroarte añadido correctamente"
+
 infoln "Añadiendo anabelsegura peer al canal..."
 joinChannel "anabelsegura"
+successln "anabelsegura añadido correctamente"
 
-# ## Set the anchor peers for each org in the channel
-# infoln "Setting anchor peer for org1..."
-# setAnchorPeer 1
-# infoln "Setting anchor peer for org2..."
-# setAnchorPeer 2
+## Set the anchor peers for each org in the channel
+infoln "Añadiendo anchor peer centroarte..."
+setAnchorPeer "centroarte"
+successln "Anchor peer centroarte añadido correctamente"
 
-# successln "Channel '$CHANNEL_NAME' joined"
+infoln "Añadiendo anchor peer anabelsegura..."
+setAnchorPeer "anabelsegura"
+successln "Anchor peer anabelsegura añadido correctamente"
+
+successln "Canal '$CHANNEL_NAME' añadido"
