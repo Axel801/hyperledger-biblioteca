@@ -55,7 +55,7 @@ createChannel() {
 
 # joinChannel ORG
 joinChannel() {
-    FABRIC_CFG_PATH=$PWD/../config/
+    FABRIC_CFG_PATH=${PWD}/../fabric-samples/config
     ORG=$1
     setVariables $ORG
     local rc=1
@@ -71,7 +71,7 @@ joinChannel() {
         COUNTER=$(expr $COUNTER + 1)
     done
     cat log.txt
-    verifyResult $res "After $MAX_RETRY attempts, peer0.org${ORG} has failed to join channel '$CHANNEL_NAME' "
+    verifyResult $res "After $MAX_RETRY attempts, peer0.${ORG} has failed to join channel '$CHANNEL_NAME' "
 }
 
 setAnchorPeer() {
