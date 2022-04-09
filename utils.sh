@@ -53,6 +53,7 @@ function setVariables(){
     export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG1_CA
     export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/centroarte.example.com/users/Admin@centroarte.example.com/msp
     export CORE_PEER_ADDRESS=localhost:7051
+    export PORT_PEER=7051
 
   elif [ $USING_ORG == "anabelsegura" ]; then
     export PEER0_ORG2_CA=${PWD}/organizations/peerOrganizations/anabelsegura.example.com/peers/peer0.anabelsegura.example.com/tls/ca.crt
@@ -60,6 +61,7 @@ function setVariables(){
     export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_ORG2_CA
     export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/anabelsegura.example.com/users/Admin@anabelsegura.example.com/msp
     export CORE_PEER_ADDRESS=localhost:9051
+    export PORT_PEER=9051
 }
 
 export -f errorln
