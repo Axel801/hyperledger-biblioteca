@@ -70,7 +70,9 @@ function createChannel(){
     . createChannel.sh $CHANNEL_NAME
 }
 
-
+function installChaincode(){
+    . installChaincode.sh
+}
 
 function appMessage(){
     echo " ____    _   _       _   _           _                               _   _                                 _                  _                       "
@@ -98,6 +100,9 @@ if [ "$MODE" == "up" ]; then
     elif [ "$MODE" == "createChannel" ]; then
     infoln "Creando canal '${CHANNEL_NAME}'."
     createChannel
+    elif [ "$MODE" == "chaincode" ]; then
+    infoln "Instalando chaincode"
+    installChaincode
 fi
 
 
