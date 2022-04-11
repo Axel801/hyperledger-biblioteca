@@ -70,8 +70,8 @@ function createChannel(){
     . createChannel.sh $CHANNEL_NAME
 }
 
-function installChaincode(){
-    . installChaincode.sh
+function invokeChaincode(){
+    . installChaincode.sh $1 $2
 }
 
 function appMessage(){
@@ -100,9 +100,15 @@ if [ "$MODE" == "up" ]; then
     elif [ "$MODE" == "createChannel" ]; then
     infoln "Creando canal '${CHANNEL_NAME}'."
     createChannel
-    elif [ "$MODE" == "chaincode" ]; then
+    elif [ "$MODE" == "packageChaincode" ]; then
+    infoln "Empaquetando chaincode"
+    invokeChaincode package
+    elif [ "$MODE" == "installChaincode" ]; then
     infoln "Instalando chaincode"
-    installChaincode
+    invokeChaincode install
+    elif [ "$MODE" == "approveChaincode" ]; then
+    infoln "Aprovando chaincode"
+    invokeChaincode approve $2
 fi
 
 
