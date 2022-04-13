@@ -25,7 +25,7 @@ Organizations:
         ID: OrdererMSP
 
         # MSPDir is the filesystem path which contains the MSP configuration
-        MSPDir: ../organizations/ordererOrganizations/example.com/msp
+        MSPDir: ../organizations/ordererOrganizations/libro.com/msp
 
         # Policies defines the set of policies at this level of the config tree
         # For organization policies, their canonical path is usually
@@ -42,17 +42,17 @@ Organizations:
                 Rule: "OR('OrdererMSP.admin')"
 
         OrdererEndpoints:
-            - orderer.example.com:7050
+            - orderer.libro.com:7050
 
-    - &CentroArte
+    - &Centroarte
         # DefaultOrg defines the organization which is used in the sampleconfig
         # of the fabric.git development environment
-        Name: CentroArteMSP
+        Name: CentroarteMSP
 
         # ID to load the MSP definition as
-        ID: CentroArteMSP
+        ID: CentroarteMSP
 
-        MSPDir: ../organizations/peerOrganizations/centroarte.example.com/msp
+        MSPDir: ../organizations/peerOrganizations/centroarte.libro.com/msp
 
         # Policies defines the set of policies at this level of the config tree
         # For organization policies, their canonical path is usually
@@ -60,26 +60,26 @@ Organizations:
         Policies:
             Readers:
                 Type: Signature
-                Rule: "OR('CentroArteMSP.admin', 'CentroArteMSP.peer', 'CentroArteMSP.client')"
+                Rule: "OR('CentroarteMSP.admin', 'CentroarteMSP.peer', 'CentroarteMSP.client')"
             Writers:
                 Type: Signature
-                Rule: "OR('CentroArteMSP.admin', 'CentroArteMSP.client')"
+                Rule: "OR('CentroarteMSP.admin', 'CentroarteMSP.client')"
             Admins:
                 Type: Signature
-                Rule: "OR('CentroArteMSP.admin')"
+                Rule: "OR('CentroarteMSP.admin')"
             Endorsement:
                 Type: Signature
-                Rule: "OR('CentroArteMSP.peer')"
+                Rule: "OR('CentroarteMSP.peer')"
 
-    - &AnabelSegura
+    - &Anabelsegura
         # DefaultOrg defines the organization which is used in the sampleconfig
         # of the fabric.git development environment
-        Name: AnabelSeguraMSP
+        Name: AnabelseguraMSP
 
         # ID to load the MSP definition as
-        ID: AnabelSeguraMSP
+        ID: AnabelseguraMSP
 
-        MSPDir: ../organizations/peerOrganizations/anabelsegura.example.com/msp
+        MSPDir: ../organizations/peerOrganizations/anabelsegura.libro.com/msp
 
         # Policies defines the set of policies at this level of the config tree
         # For organization policies, their canonical path is usually
@@ -87,17 +87,18 @@ Organizations:
         Policies:
             Readers:
                 Type: Signature
-                Rule: "OR('AnabelSeguraMSP.admin', 'AnabelSeguraMSP.peer', 'AnabelSeguraMSP.client')"
+                Rule: "OR('AnabelseguraMSP.admin', 'AnabelseguraMSP.peer', 'AnabelseguraMSP.client')"
             Writers:
                 Type: Signature
-                Rule: "OR('AnabelSeguraMSP.admin', 'AnabelSeguraMSP.client')"
+                Rule: "OR('AnabelseguraMSP.admin', 'AnabelseguraMSP.client')"
             Admins:
                 Type: Signature
-                Rule: "OR('AnabelSeguraMSP.admin')"
+                Rule: "OR('AnabelseguraMSP.admin')"
             Endorsement:
                 Type: Signature
-                Rule: "OR('AnabelSeguraMSP.peer')"
-    
+                Rule: "OR('AnabelseguraMSP.peer')"
+
+
 ################################################################################
 #
 #   SECTION: Capabilities
@@ -208,14 +209,21 @@ Orderer: &OrdererDefaults
     # as TLS validation.  The preferred way to specify orderer addresses is now
     # to include the OrdererEndpoints item in your org definition
     Addresses:
-        - orderer.example.com:7050
+        - orderer.libro.com:7050
 
     EtcdRaft:
         Consenters:
-        - Host: orderer.example.com
+        - Host: orderer.libro.com
           Port: 7050
-          ClientTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
-          ServerTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+          ClientTLSCert: ../organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/tls/server.crt
+          ServerTLSCert: ../organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/tls/server.crt
+
+        Options:
+            TickInterval: 2500ms
+            ElectionTick: 5
+            HeartbeatTick: 1
+            MaxInflightBlocks: 5
+            SnapshotIntervalSize: 16 MB
 
     # Batch Timeout: The amount of time to wait before creating a batch
     BatchTimeout: 2s
@@ -300,7 +308,7 @@ Channel: &ChannelDefaults
 ################################################################################
 Profiles:
 
-    TwoOrgsApplicationGenesis:
+    LibroApplicationGenesis:
         <<: *ChannelDefaults
         Orderer:
             <<: *OrdererDefaults
@@ -310,8 +318,9 @@ Profiles:
         Application:
             <<: *ApplicationDefaults
             Organizations:
-                - *CentroArte
-                - *AnabelSegura
+                - *Centroarte
+                - *Anabelsegura
             Capabilities: *ApplicationCapabilities
 
+   
 
