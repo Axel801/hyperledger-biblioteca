@@ -150,13 +150,13 @@ package main
   }
 
   // TransferLibro actualiza el dueño del Libro en el world state
-  func (s *SmartContract) TransferLibro(ctx contractapi.TransactionContextInterface, id string, newUser string) error {
+  func (s *SmartContract) TransferLibro(ctx contractapi.TransactionContextInterface, id string, newOwner string) error {
     libro, err := s.ReadLibro(ctx, id)
     if err != nil {
       return err
     }
 
-    libro.User = newUser
+    libro.Owner = newOwner
     libroJSON, err := json.Marshal(libro)
     if err != nil {
       return err
@@ -244,7 +244,7 @@ package main
       record := HistoryQueryResult{
         TxId:      response.TxId,
         Timestamp: timestamp,
-        Record:    &farmaco,
+        Record:    &libro,
         IsDelete:  response.IsDelete,
       }
       records = append(records, record)
