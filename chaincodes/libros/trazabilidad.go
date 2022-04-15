@@ -62,15 +62,15 @@ package main
     return nil
   }
 
-  func (s *SmartContract) CreateLibro(ctx contractapi.TransactionContextInterface, nombre string, owner string, estado string) error {
+  func (s *SmartContract) CreateLibro(ctx contractapi.TransactionContextInterface, nombre string,  estado string) error {
 
     myuuid := uuid.NewV4().String()
     fmt.Println("Nuevo libro UUID:", myuuid)
-
+    mspid, _:=cid.GetMSPID(ctx.GetStub())
     libro := Libro{
       ID:          myuuid,
       Nombre:      nombre,
-      Owner:       owner,
+      Owner:       mspid,
       Estado:		   estado,
     }
       
@@ -251,6 +251,39 @@ package main
     }
 
     return records, nil
+  }
+
+  func (t *SimpleChaincode) GetLibroAvailable(ctx contractapi.TransactionContextInterface) ([]*Asset, error) {
+    queryString := fmt.Sprintf(`{"selector":{"docType":"asset","estado":"%s"}}`, "Disponible")
+    return getQueryResultForQueryString(ctx, queryString)
+  }
+
+  func getQueryResultForQueryString(ctx contractapi.TransactionContextInterface, queryString string) ([]*Asset, error) {
+
+    resultsIterator, err := ctx.GetStub().GetQueryResult(queryString)
+    if err != nil {
+      return nil, err
+    }
+    defer resultsIterator.Close()
+    return constructQueryResponseFromIterator(resultsIterator)
+  }
+
+  // constructQueryResponseFromIterator constructs a slice of assets from the resultsIterator
+  func constructQueryResponseFromIterator(resultsIterator shim.StateQueryIteratorInterface) ([]*Asset, error) {
+    var assets []*Asset
+    for resultsIterator.HasNext() {
+      queryResult, err := resultsIterator.Next()
+      if err != nil {
+        return nil, err
+      }
+      var asset Asset
+      err = json.Unmarshal(queryResult.Value, &asset)
+      if err != nil {
+        return nil, err
+      }
+      assets = append(assets, &asset)
+    }
+    return assets, nil
   }
 
   func main() {
