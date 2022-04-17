@@ -10,7 +10,9 @@ package main
     "github.com/satori/go.uuid"
     "github.com/hyperledger/fabric-contract-api-go/contractapi"
 
+    "github.com/hyperledger/fabric-chaincode-go/shim"
     "github.com/hyperledger/fabric-chaincode-go/pkg/cid"
+    "strings"
   )
 
   type SmartContract struct {
@@ -149,14 +151,20 @@ package main
     return libroJSON != nil, nil
   }
 
-  // TransferLibro actualiza el dueño del Libro en el world state
-  func (s *SmartContract) TransferLibro(ctx contractapi.TransactionContextInterface, id string, newOwner string) error {
+  // LendLibro actualiza el dueño del Libro en el world state
+  func (s *SmartContract) LendLibro(ctx contractapi.TransactionContextInterface, id string, newOwner string) error {
     libro, err := s.ReadLibro(ctx, id)
     if err != nil {
       return err
     }
+    //Si el libro no se encuentra disponible y no lo tiene las bibliotecas ==> Error
+    if (libro.Estado != "Disponible" && !strings.HasSuffix(libro.Owner,"MSP")){
+      return fmt.Errorf("El libro %s no está disponible", id)
+    }
 
+    //TODO modificar el chaincode del usuario
     libro.Owner = newOwner
+    libro.Estado = "Alquilado"
     libroJSON, err := json.Marshal(libro)
     if err != nil {
       return err
@@ -164,6 +172,30 @@ package main
 
     return ctx.GetStub().PutState(id, libroJSON)
   }
+
+  // ReturnLibro actualiza el dueño del Libro en el world state
+  func (s *SmartContract) ReturnLibro(ctx contractapi.TransactionContextInterface, id string) error {
+    libro, err := s.ReadLibro(ctx, id)
+    if err != nil {
+      return err
+    }
+    //Si el libro no se encuentra disponible y no lo tiene las bibliotecas ==> Error
+    if (libro.Estado != "Alquilado" && strings.HasSuffix(libro.Owner,"MSP")){
+      return return fmt.Errorf("El libro %s no está disponible", id)
+    }
+
+    //TODO modificar el chaincode del usuario
+    mspid, _:=cid.GetMSPID(ctx.GetStub())
+    libro.Owner = mspid
+    libro.Estado = "Disponible"
+    libroJSON, err := json.Marshal(libro)
+    if err != nil {
+      return err
+    }
+
+    return ctx.GetStub().PutState(id, libroJSON)
+  }
+
 
   // StatusLibro actualiza el estado del Libro en el world state
   func (s *SmartContract) StatusLibro(ctx contractapi.TransactionContextInterface, id string, newStatus string) error {
@@ -253,12 +285,12 @@ package main
     return records, nil
   }
 
-  func (t *SimpleChaincode) GetLibroAvailable(ctx contractapi.TransactionContextInterface) ([]*Asset, error) {
-    queryString := fmt.Sprintf(`{"selector":{"docType":"asset","estado":"%s"}}`, "Disponible")
+  func (t *SmartContract) GetLibroAvailable(ctx contractapi.TransactionContextInterface) ([]*Libro, error) {
+    queryString := fmt.Sprintf(`{"selector":{"estado":"%s"}}`, "Disponible")
     return getQueryResultForQueryString(ctx, queryString)
   }
 
-  func getQueryResultForQueryString(ctx contractapi.TransactionContextInterface, queryString string) ([]*Asset, error) {
+  func getQueryResultForQueryString(ctx contractapi.TransactionContextInterface, queryString string) ([]*Libro, error) {
 
     resultsIterator, err := ctx.GetStub().GetQueryResult(queryString)
     if err != nil {
@@ -269,14 +301,14 @@ package main
   }
 
   // constructQueryResponseFromIterator constructs a slice of assets from the resultsIterator
-  func constructQueryResponseFromIterator(resultsIterator shim.StateQueryIteratorInterface) ([]*Asset, error) {
-    var assets []*Asset
+  func constructQueryResponseFromIterator(resultsIterator shim.StateQueryIteratorInterface) ([]*Libro, error) {
+    var assets []*Libro
     for resultsIterator.HasNext() {
       queryResult, err := resultsIterator.Next()
       if err != nil {
         return nil, err
       }
-      var asset Asset
+      var asset Libro
       err = json.Unmarshal(queryResult.Value, &asset)
       if err != nil {
         return nil, err
