@@ -196,7 +196,6 @@ package main
     return ctx.GetStub().PutState(id, libroJSON)
   }
 
-
   // StatusLibro actualiza el estado del Libro en el world state
   func (s *SmartContract) StatusLibro(ctx contractapi.TransactionContextInterface, id string, newStatus string) error {
     libro, err := s.ReadLibro(ctx, id)
