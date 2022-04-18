@@ -7,12 +7,12 @@ package main
     "time"
 
     "github.com/golang/protobuf/ptypes"
-    "github.com/satori/go.uuid"
+    // "github.com/satori/go.uuid"
     "github.com/hyperledger/fabric-contract-api-go/contractapi"
 
-    "github.com/hyperledger/fabric-chaincode-go/shim"
-    "github.com/hyperledger/fabric-chaincode-go/pkg/cid"
-    "strings"
+    // "github.com/hyperledger/fabric-chaincode-go/shim"
+    // "github.com/hyperledger/fabric-chaincode-go/pkg/cid"
+    // "strings"
   )
 
   type SmartContract struct {
@@ -25,19 +25,17 @@ package main
   }
 
   type HistoryQueryResult struct {
-		Record    *Libro    `json:"record"`
-		TxId      string    `json:"txId"`
-		Timestamp time.Time `json:"timestamp"`
-		IsDelete  bool      `json:"isDelete"`
+		Record    *Usuario    `json:"record"`
+		TxId      string      `json:"txId"`
+		Timestamp time.Time   `json:"timestamp"`
+		IsDelete  bool        `json:"isDelete"`
   }
 
   func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) error {
     
-   )
-    
     usuarios := []Usuario{
-      {ID: 1, Libro: ""},
-      {ID: 2, Libro: ""},
+      {ID: "1", Libro: "0"},
+      {ID: "2", Libro: "0"},
     }
 
     for _, usuario := range usuarios {
@@ -65,7 +63,7 @@ package main
     }
     usuario := Usuario{
       ID:    id,
-      Libro: ""
+      Libro: "0",
     }
       
     usuarioJSON, err := json.Marshal(usuario)
@@ -78,12 +76,12 @@ package main
 
   // ReadUser devuelve el User almacenado en el World State con su última modificación
   func (s *SmartContract) ReadUser(ctx contractapi.TransactionContextInterface, id string) (*Usuario, error) {
-    exists, err := s.UserExists(ctx, id)
+    userJSON, err := ctx.GetStub().GetState(id)
     if err != nil {
-      return err
+      return nil, fmt.Errorf("Error al leer de Fabric: %v", err)
     }
-    if !exists {
-      return fmt.Errorf("El usuario %s existe en la blockchain", id)
+    if userJSON == nil {
+      return nil, fmt.Errorf("El user %s no existe", id)
     }
 
     var user Usuario
@@ -126,19 +124,19 @@ package main
     }
     defer resultsIterator.Close()
 
-    var usuarios []*Usuario
+    var usuarios []*Libro
     for resultsIterator.HasNext() {
       queryResponse, err := resultsIterator.Next()
       if err != nil {
         return nil, err
       }
 
-      var usuario Usuario
-      err = json.Unmarshal(queryResponse.Value, &usuario)
+      var libro Libro
+      err = json.Unmarshal(queryResponse.Value, &libro)
       if err != nil {
         return nil, err
       }
-      usuarios = append(usuarios, &usuario)
+      usuarios = append(usuarios, &libro)
     }
 
     return usuarios, nil
@@ -193,10 +191,10 @@ package main
   func (s *SmartContract) HaveBook(ctx contractapi.TransactionContextInterface, id string) (bool, error) {
     user, err := s.ReadUser(ctx, id)
     if err != nil {
-      return err
+      return false, err
     }
    
-    return user.Libro != ""
+    return user.Libro != "0" , nil
     
   }
 

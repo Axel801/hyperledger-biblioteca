@@ -181,7 +181,7 @@ package main
     }
     //Si el libro no se encuentra disponible y no lo tiene las bibliotecas ==> Error
     if (libro.Estado != "Alquilado" && strings.HasSuffix(libro.Owner,"MSP")){
-      return return fmt.Errorf("El libro %s no está disponible", id)
+      return fmt.Errorf("El libro %s no está disponible", id)
     }
 
     //TODO modificar el chaincode del usuario
