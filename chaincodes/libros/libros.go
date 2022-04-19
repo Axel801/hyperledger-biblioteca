@@ -11,8 +11,10 @@ package main
     "github.com/hyperledger/fabric-contract-api-go/contractapi"
 
     "github.com/hyperledger/fabric-chaincode-go/shim"
+    //"github.com/hyperledger/fabric-protos-go/peer"
     "github.com/hyperledger/fabric-chaincode-go/pkg/cid"
     "strings"
+    "strconv"
   )
 
   type SmartContract struct {
@@ -162,13 +164,29 @@ package main
       return fmt.Errorf("El libro %s no está disponible", id)
     }
 
-    //TODO modificar el chaincode del usuario
+    //Validar si el usuario tiene libro alquilado
+    userHaveBook, err := invokeUserHaveBook(ctx.GetStub(), newOwner)
+    if err != nil {
+      return err
+    }  
+    
+    if userHaveBook {
+      return fmt.Errorf("El usuario %s ya tiene un libro alquilado", newOwner)
+    }
+
+    
     libro.Owner = newOwner
     libro.Estado = "Alquilado"
     libroJSON, err := json.Marshal(libro)
     if err != nil {
       return err
     }
+
+     // Actualizamos el estado del usuario
+    _, err = invokeUserUpdateBook(ctx.GetStub(), newOwner, id)
+    if err != nil {
+      return err
+    }  
 
     return ctx.GetStub().PutState(id, libroJSON)
   }
@@ -184,7 +202,12 @@ package main
       return fmt.Errorf("El libro %s no está disponible", id)
     }
 
-    //TODO modificar el chaincode del usuario
+    // Actualizamos el estado del usuario
+    _, err = invokeUserUpdateBook(ctx.GetStub(), libro.Owner, "0")
+    if err != nil {
+      return err
+    }  
+
     mspid, _:=cid.GetMSPID(ctx.GetStub())
     libro.Owner = mspid
     libro.Estado = "Disponible"
@@ -316,6 +339,44 @@ package main
     }
     return assets, nil
   }
+
+  func invokeUserHaveBook(stub shim.ChaincodeStubInterface, userID string) (bool,error){
+    params := []string{"HaveBook", userID}
+	  queryArgs := make([][]byte, len(params))
+    for i, arg := range params {
+      queryArgs[i] = []byte(arg)
+    }
+
+    response := stub.InvokeChaincode("user", queryArgs, "librochannel")
+    
+
+    if response.Status != shim.OK {
+      return false, fmt.Errorf("Failed to query chaincode. Got error: %s", response.Payload)
+    }
+    boolValue, _ := strconv.ParseBool(string(response.Payload))
+    log.Println("RESPUESTA: ", boolValue)
+    return boolValue, nil
+  }
+
+  func invokeUserUpdateBook(stub shim.ChaincodeStubInterface, userID string,idBook string) (string,error){
+    params := []string{"UpdateBook", userID,idBook}
+	  queryArgs := make([][]byte, len(params))
+    for i, arg := range params {
+      queryArgs[i] = []byte(arg)
+    }
+
+    response := stub.InvokeChaincode("user", queryArgs, "librochannel")
+    
+
+    if response.Status != shim.OK {
+      return "", fmt.Errorf("Failed to query chaincode. Got error: %s", response.Payload)
+    }
+    
+    log.Println("RESPUESTA: ", string(response.Payload))
+    return idBook, nil
+  }
+
+
 
   func main() {
     libroChaincode, err := contractapi.NewChaincode(&SmartContract{})

@@ -124,19 +124,19 @@ package main
     }
     defer resultsIterator.Close()
 
-    var usuarios []*Libro
+    var usuarios []*Usuario
     for resultsIterator.HasNext() {
       queryResponse, err := resultsIterator.Next()
       if err != nil {
         return nil, err
       }
 
-      var libro Libro
-      err = json.Unmarshal(queryResponse.Value, &libro)
+      var usuario Usuario
+      err = json.Unmarshal(queryResponse.Value, &usuario)
       if err != nil {
         return nil, err
       }
-      usuarios = append(usuarios, &libro)
+      usuarios = append(usuarios, &usuario)
     }
 
     return usuarios, nil
@@ -209,7 +209,7 @@ package main
     if err != nil {
       return err
     }
-
+    
     return ctx.GetStub().PutState(userID, userJSON)
   }
 
