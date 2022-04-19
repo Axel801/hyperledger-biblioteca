@@ -1,0 +1,167 @@
+cd ~/curso
+
+docker stop $(docker ps -a -q)
+docker rm $(docker ps -a -q)
+docker volume prune
+docker network prune
+
+sudo rm -rf organizations/fabric-ca/centroarte/
+sudo rm -rf organizations/fabric-ca/anabelsegura/
+sudo rm -rf organizations/fabric-ca/ordererOrg/
+sudo rm -rf organizations/peerOrganizations
+sudo rm -rf organizations/ordererOrganizations
+sudo rm -rf channel-artifacts/
+mkdir channel-artifacts
+
+docker-compose -f compose/compose-libro-ca.yaml up -d
+
+export PATH=${PWD}/../fabric-samples/bin:${PWD}:$PATH
+export FABRIC_CFG_PATH=${PWD}/configtx
+
+. ./organizations/fabric-ca/registerEnroll.sh && createCentroarte
+. ./organizations/fabric-ca/registerEnroll.sh && createAnabelsegura
+. ./organizations/fabric-ca/registerEnroll.sh && createOrderer
+
+
+configtxgen -profile LibroApplicationGenesis -outputBlock ./channel-artifacts/librochannel.block -channelID librochannel
+
+export FABRIC_CFG_PATH=${PWD}/../fabric-samples/config
+export ORDERER_CA=${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem
+export ORDERER_ADMIN_TLS_SIGN_CERT=${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/tls/server.crt
+export ORDERER_ADMIN_TLS_PRIVATE_KEY=${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/tls/server.key
+
+docker-compose -f compose/compose-libro.yaml  up -d
+
+osnadmin channel join --channelID librochannel --config-block ./channel-artifacts/librochannel.block -o localhost:7053 --ca-file "$ORDERER_CA" --client-cert "$ORDERER_ADMIN_TLS_SIGN_CERT" --client-key "$ORDERER_ADMIN_TLS_PRIVATE_KEY"
+osnadmin channel list -o localhost:7053 --ca-file "$ORDERER_CA" --client-cert "$ORDERER_ADMIN_TLS_SIGN_CERT" --client-key "$ORDERER_ADMIN_TLS_PRIVATE_KEY"
+
+export CORE_PEER_TLS_ENABLED=true
+export PEER0_EMPRESA_CA=${PWD}/organizations/peerOrganizations/centroarte.libro.com/peers/peer0.centroarte.libro.com/tls/ca.crt
+export CORE_PEER_LOCALMSPID="CentroarteMSP"
+export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_EMPRESA_CA
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/centroarte.libro.com/users/Admin@centroarte.libro.com/msp
+export CORE_PEER_ADDRESS=localhost:7051
+peer channel join -b ./channel-artifacts/librochannel.block
+
+
+
+export PEER0_EMPRESA_CA=${PWD}/organizations/peerOrganizations/anabelsegura.libro.com/peers/peer0.anabelsegura.libro.com/tls/ca.crt
+export CORE_PEER_LOCALMSPID="AnabelseguraMSP"
+export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_EMPRESA_CA
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/anabelsegura.libro.com/users/Admin@anabelsegura.libro.com/msp
+export CORE_PEER_ADDRESS=localhost:9051
+peer channel join -b ./channel-artifacts/librochannel.block
+
+
+//DESARROLLAR LOS CHAINCODES
+
+
+
+cd ~/curso/chaincodes/libros
+go mod init libros.go 
+go mod vendor
+
+cd ~/curso/chaincodes/usuarios
+go mod init usuarios.go 
+go mod vendor
+
+
+cd ~/curso
+export PATH=${PWD}/../fabric-samples/bin:${PWD}:$PATH
+export FABRIC_CFG_PATH=${PWD}/../fabric-samples/config
+export SEQUENCE_ID=1
+
+peer version
+peer lifecycle chaincode package transfer.tar.gz --path chaincodes/libros --lang golang --label transfer_${SEQUENCE_ID}.0
+peer lifecycle chaincode package usuario.tar.gz --path chaincodes/usuarios --lang golang --label user_${SEQUENCE_ID}.0
+
+export CORE_PEER_TLS_ENABLED=true
+export CORE_PEER_LOCALMSPID="CentroarteMSP"
+export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/centroarte.libro.com/peers/peer0.centroarte.libro.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/centroarte.libro.com/users/Admin@centroarte.libro.com/msp
+export CORE_PEER_ADDRESS=localhost:7051
+peer lifecycle chaincode install transfer.tar.gz
+peer lifecycle chaincode install usuario.tar.gz
+
+peer lifecycle chaincode queryinstalled
+//copiar el ID del package, es una combinación del nombre del chaincode y el trazabilidad del contenido del código
+export CC_PACKAGE_TRANSFER_ID=transfer_1.0:4b95780b3b5b93a2069215a38e63c5bfedf3bc75e654aeb7c3d16ae5932d6171
+export CC_PACKAGE_USER_ID=user_1.0:40829de5555b486cfed3536bdd8775bc06bc51f8a81c970285fa2b1d6d271e4e
+
+
+
+peer lifecycle chaincode approveformyorg -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --channelID librochannel --name transfer --signature-policy "OR('CentroarteMSP.member','AnabelseguraMSP.member')" --version $SEQUENCE_ID.0 --package-id $CC_PACKAGE_TRANSFER_ID --sequence $SEQUENCE_ID --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem
+peer lifecycle chaincode approveformyorg -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --channelID librochannel --name user --signature-policy "OR('CentroarteMSP.member','AnabelseguraMSP.member')" --version $SEQUENCE_ID.0 --package-id $CC_PACKAGE_USER_ID --sequence $SEQUENCE_ID --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem
+
+
+
+
+export PEER0_EMPRESA_CA=${PWD}/organizations/peerOrganizations/anabelsegura.libro.com/peers/peer0.anabelsegura.libro.com/tls/ca.crt
+export CORE_PEER_LOCALMSPID="AnabelseguraMSP"
+export CORE_PEER_TLS_ROOTCERT_FILE=$PEER0_EMPRESA_CA
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/anabelsegura.libro.com/users/Admin@anabelsegura.libro.com/msp
+export CORE_PEER_ADDRESS=localhost:9051
+peer lifecycle chaincode install transfer.tar.gz
+peer lifecycle chaincode install usuario.tar.gz
+
+
+peer lifecycle chaincode approveformyorg -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --channelID librochannel --name transfer --signature-policy "OR('CentroarteMSP.member','AnabelseguraMSP.member')" --version $SEQUENCE_ID.0 --package-id $CC_PACKAGE_TRANSFER_ID --sequence $SEQUENCE_ID --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem
+peer lifecycle chaincode approveformyorg -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --channelID librochannel --name user --signature-policy "OR('CentroarteMSP.member','AnabelseguraMSP.member')" --version $SEQUENCE_ID.0 --package-id $CC_PACKAGE_USER_ID --sequence $SEQUENCE_ID --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem
+
+
+peer lifecycle chaincode checkcommitreadiness --channelID librochannel --name transfer --version $SEQUENCE_ID.0 --sequence $SEQUENCE_ID --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem --output json
+peer lifecycle chaincode checkcommitreadiness --channelID librochannel --name user --version $SEQUENCE_ID.0 --sequence $SEQUENCE_ID --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem --output json
+
+
+peer lifecycle chaincode commit -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --channelID librochannel --name transfer --signature-policy "OR('CentroarteMSP.member','AnabelseguraMSP.member')" --version $SEQUENCE_ID.0 --sequence $SEQUENCE_ID --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem --peerAddresses localhost:7051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/centroarte.libro.com/peers/peer0.centroarte.libro.com/tls/ca.crt --peerAddresses localhost:9051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/anabelsegura.libro.com/peers/peer0.anabelsegura.libro.com/tls/ca.crt 
+peer lifecycle chaincode commit -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --channelID librochannel --name user --signature-policy "OR('CentroarteMSP.member','AnabelseguraMSP.member')" --version $SEQUENCE_ID.0 --sequence $SEQUENCE_ID --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem --peerAddresses localhost:7051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/centroarte.libro.com/peers/peer0.centroarte.libro.com/tls/ca.crt --peerAddresses localhost:9051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/anabelsegura.libro.com/peers/peer0.anabelsegura.libro.com/tls/ca.crt 
+
+
+peer lifecycle chaincode querycommitted --channelID librochannel --name transfer --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem
+peer lifecycle chaincode querycommitted --channelID librochannel --name user --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem
+
+
+
+
+//probar el chaincode
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem -C librochannel -n transfer --peerAddresses localhost:7051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/centroarte.libro.com/peers/peer0.centroarte.libro.com/tls/ca.crt -c '{"function":"initLedger","Args":[""]}'
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem -C librochannel -n user --peerAddresses localhost:7051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/centroarte.libro.com/peers/peer0.centroarte.libro.com/tls/ca.crt -c '{"function":"initLedger","Args":[""]}'
+
+
+
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem -C librochannel -n user --peerAddresses localhost:7051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/centroarte.libro.com/peers/peer0.centroarte.libro.com/tls/ca.crt -c '{"function":"updateBook","Args":["1","qwerty"]}'
+
+
+peer chaincode query -C librochannel -n transfer -c '{"Args":["GetAllLibros",""]}'
+
+peer chaincode query -C librochannel -n user -c '{"Args":["GetAllUsers",""]}'
+
+peer chaincode query -C librochannel -n user -c '{"Args":["ReadUser","1"]}'
+
+peer chaincode query -C librochannel -n user -c '{"Args":["GetUserHistory","1"]}'
+
+peer chaincode query -C librochannel -n transfer -c '{"Args":["GetLibroHistory","6766f7de-9481-4546-bea7-5ab85ea588c7"]}'
+
+export CORE_PEER_TLS_ENABLED=true
+export CORE_PEER_LOCALMSPID="CentroarteMSP"
+export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/centroarte.libro.com/peers/peer0.centroarte.libro.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/centroarte.libro.com/users/Admin@centroarte.libro.com/msp
+export CORE_PEER_ADDRESS=localhost:7051
+
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem -C librochannel -n transfer --peerAddresses localhost:7051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/centroarte.libro.com/peers/peer0.centroarte.libro.com/tls/ca.crt -c '{"function":"createLibro","Args":["Eragon","Alquilado"]}'
+
+
+peer chaincode query -C librochannel -n transfer -c '{"Args":["GetLibroAvailable",""]}'
+
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem -C librochannel -n transfer --peerAddresses localhost:7051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/centroarte.libro.com/peers/peer0.centroarte.libro.com/tls/ca.crt -c '{"function":"StatusLibro","Args":["d088c1e1-129a-4a99-b7eb-9cd90d5cb108","Disponible"]}'
+
+peer chaincode query -C librochannel -n transfer -c '{"Args":["GetLibroHistory","d088c1e1-129a-4a99-b7eb-9cd90d5cb108"]}'
+
+
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem -C librochannel -n transfer --peerAddresses localhost:7051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/centroarte.libro.com/peers/peer0.centroarte.libro.com/tls/ca.crt -c '{"function":"LendLibro","Args":["6766f7de-9481-4546-bea7-5ab85ea588c7","1"]}'
+
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.libro.com --tls --cafile ${PWD}/organizations/ordererOrganizations/libro.com/orderers/orderer.libro.com/msp/tlscacerts/tlsca.libro.com-cert.pem -C librochannel -n transfer --peerAddresses localhost:7051 --tlsRootCertFiles ${PWD}/organizations/peerOrganizations/centroarte.libro.com/peers/peer0.centroarte.libro.com/tls/ca.crt -c '{"function":"ReturnLibro","Args":["6766f7de-9481-4546-bea7-5ab85ea588c7"]}'
+
+
+
+
